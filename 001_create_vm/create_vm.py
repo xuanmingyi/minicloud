@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
+import shutil
+import os
+
 from jinja2 import Template
 import libvirt
 import uuid
+import random
 
 
 xml_template = """
@@ -23,7 +27,7 @@ xml_template = """
     </disk>
     <interface type='network'>
       <source network='default'/>
-      <mac address='52:54:00:10:c0:d9'/>
+      <mac address='{{ mac }}'/>
       <model type='virtio' />
     </interface>
     <graphics type='vnc' port='-1' keymap='de'/>
@@ -32,15 +36,36 @@ xml_template = """
 """
 
 
+image_path = "/home/sin/vms/cirros-0.6.1-x86_64-disk.img"
+disk_path = None
+name = str(uuid.uuid4())
+
+
+def random_mac():
+    mac = [0x00, 0x16, 0x3e, random.randint(0x00, 0x7f), random.randint(0x00, 0x7f), random.randint(0x00, 0x7f)]
+    return ":".join(map(lambda x: "%02x" % x, mac))
+
+
+def copy_image_to_disk():
+    global disk_path
+    global name
+    disk_base_path = os.path.join("/home/sin/vms", name)
+    os.mkdir(disk_base_path)
+    disk_path = os.path.join(disk_base_path, "disk.img")
+    shutil.copyfile(image_path, disk_path)
+
+
 def main():
     conn = libvirt.open("qemu:///system")
-    u = str(uuid.uuid4())
-    name = u[:8]
+
+    copy_image_to_disk()
+
     data = {
         "name": name,
         "cpu": 1,
         "memory": 1024 * 128,
-        "image": "/home/sin/vms/linux2/linux2.img"
+        "image": disk_path,
+        "mac": random_mac()
     }
     template = Template(xml_template)
     xml = template.render(**data)
